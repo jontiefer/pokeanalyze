@@ -1,6 +1,6 @@
-#Pokemon Height/Weight Analyzer
+# Pokemon Height/Weight Analyzer
 
-##Included Projects
+## Included Projects
 PokeAnalyze.CLI (Executable Project)
 PokeAnalyze.Analytics
 PokeAnalyze.Tools
