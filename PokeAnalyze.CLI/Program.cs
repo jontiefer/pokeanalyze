@@ -14,6 +14,11 @@ namespace PokeAnalyze.CLI
             int limit = 0;
             int offset = 0;
 
+#if DEBUG
+            args[0] = "100";
+            args[1] = "0";
+#endif
+
             if (args.Length == 0)
                 limit = 2000;
             else
@@ -27,7 +32,7 @@ namespace PokeAnalyze.CLI
             PokemonAnalyzer analyzer = new PokemonAnalyzer();
             await analyzer.CalculatePokemonHeightWeightAverages(limit, offset);
             //FOR TESTING
-            //await analyzer.TestSpeed();
+            //analyzer.TestSpeed();
         }
     }
 }

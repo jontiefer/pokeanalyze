@@ -34,14 +34,14 @@ namespace PokeAnalyze.Analytics
             return response.Response;
         }
 
-        public async Task SpeedTest(int max)
+        public void SpeedTest(int max)
         {
-            for (int i = 0; i < max; i++)
+            Task.WhenAll(Enumerable.Range(1, max).Select(async i =>
             {
                 var response = await _httpService.GetAsync<PokemonQueryList>(Url + "?limit=100&offset=0");
                 if (!response.Success)
                     throw new ApplicationException(await response.GetBodyAsync());
-            }//next i
+            })).GetAwaiter().GetResult();
         }
     }
 }

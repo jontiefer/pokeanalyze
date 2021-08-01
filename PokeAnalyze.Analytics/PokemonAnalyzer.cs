@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -19,11 +20,13 @@ namespace PokeAnalyze.Analytics
         private int _pokemonWeightTotal = 0;
 
         private List<string> _pokemonTypes = null;
-        private Dictionary<string, int> _pokemonTypeCount = null;
-        private Dictionary<string, int> _pokemonTypeHeightTotal = null;
-        private Dictionary<string, int> _pokemonTypeWeightTotal = null;
+        private ConcurrentDictionary<string, int> _pokemonTypeCount = null;
+        private ConcurrentDictionary<string, int> _pokemonTypeHeightTotal = null;
+        private ConcurrentDictionary<string, int> _pokemonTypeWeightTotal = null;
 
         private DateTime _timeStart;
+
+        private static object _lock = new object();
 
         public PokemonAnalyzer()
         {
@@ -35,17 +38,17 @@ namespace PokeAnalyze.Analytics
             _pokemonHeightTotal = 0;
             _pokemonWeightTotal = 0;
             _pokemonTypes = new List<string>();
-            _pokemonTypeCount = new Dictionary<string, int>();
-            _pokemonTypeHeightTotal = new Dictionary<string, int>();
-            _pokemonTypeWeightTotal = new Dictionary<string, int>();
+            _pokemonTypeCount = new ConcurrentDictionary<string, int>();
+            _pokemonTypeHeightTotal = new ConcurrentDictionary<string, int>();
+            _pokemonTypeWeightTotal = new ConcurrentDictionary<string, int>();
         }
 
         public double ElapsedTime { get; private set; }
 
-        public async Task TestSpeed()
-        { 
+        public void TestSpeed()
+        {
             _timeStart = DateTime.Now;
-            await _repo.SpeedTest(100);
+            _repo.SpeedTest(100);
 
             ElapsedTime = DateTime.Now.Subtract(_timeStart).TotalSeconds;
 
@@ -62,21 +65,22 @@ namespace PokeAnalyze.Analytics
             InitCalcData();
             var pokemonQueryList = await _repo.QueryPokemonSet(limit, offset);
 
-            foreach (var pokemonQryItem in pokemonQueryList.Items)
-            {
-                var pokemon = await _repo.GetPokemonItem(pokemonQryItem.Url);
+            Task.WhenAll(Enumerable.Range(0, pokemonQueryList.Items.Count - 1)
+                .Select(async i =>
+                {
+                    var pokemon = await _repo.GetPokemonItem(pokemonQueryList.Items[i].Url);
 
-                _pokemonHeightTotal += pokemon.Height;
-                _pokemonWeightTotal += pokemon.Weight;
-                 
-                AddHeightWeightByTypeData(pokemon);
-            }//next pokemonQryItem
+                    _pokemonHeightTotal += pokemon.Height;
+                    _pokemonWeightTotal += pokemon.Weight;
+
+                    AddHeightWeightByTypeData(pokemon);
+                })).GetAwaiter().GetResult();
 
             double pokemonHeightAvg = _pokemonHeightTotal / Convert.ToDouble(pokemonQueryList.Items.Count);
             double pokemonWeightAvg = _pokemonWeightTotal / Convert.ToDouble(pokemonQueryList.Items.Count);
 
             var pokemonHeightAvgByType = CalculateAveragesByType(_pokemonTypeHeightTotal);
-            var pokemonWeightAvgByType = CalculateAveragesByType( _pokemonTypeWeightTotal);
+            var pokemonWeightAvgByType = CalculateAveragesByType(_pokemonTypeWeightTotal);
 
             Console.WriteLine(new string('-', 25));
             Console.WriteLine($"Pokemon Average Height: {pokemonHeightAvg}");
@@ -119,23 +123,26 @@ namespace PokeAnalyze.Analytics
         {
             foreach (var pokType in pokemon.Types)
             {
-                if (!_pokemonTypeHeightTotal.ContainsKey(pokType.Type.Name))
+                lock (_lock)
                 {
-                    _pokemonTypes.Add(pokType.Type.Name);
-                    _pokemonTypeCount[pokType.Type.Name] = 1;
-                    _pokemonTypeHeightTotal[pokType.Type.Name] = pokemon.Height;
-                    _pokemonTypeWeightTotal[pokType.Type.Name] = pokemon.Weight;
-                }
-                else
-                {
-                    _pokemonTypeCount[pokType.Type.Name]++;
-                    _pokemonTypeHeightTotal[pokType.Type.Name] += pokemon.Height;
-                    _pokemonTypeWeightTotal[pokType.Type.Name] += pokemon.Weight;
-                }//end if
+                    if (!_pokemonTypeHeightTotal.ContainsKey(pokType.Type.Name))
+                    {
+                        _pokemonTypes.Add(pokType.Type.Name);
+                        _pokemonTypeCount[pokType.Type.Name] = 1;
+                        _pokemonTypeHeightTotal[pokType.Type.Name] = pokemon.Height;
+                        _pokemonTypeWeightTotal[pokType.Type.Name] = pokemon.Weight;
+                    }
+                    else
+                    {
+                        _pokemonTypeCount[pokType.Type.Name]++;
+                        _pokemonTypeHeightTotal[pokType.Type.Name] += pokemon.Height;
+                        _pokemonTypeWeightTotal[pokType.Type.Name] += pokemon.Weight;
+                    } //end if
+                }//end lock
             }//next pokType
         }
 
-        private List<Tuple<string, double>> CalculateAveragesByType(Dictionary<string, int> totalsByType)
+        private List<Tuple<string, double>> CalculateAveragesByType(ConcurrentDictionary<string, int> totalsByType)
         {
             List<Tuple<string, double>> averagesByType = new List<Tuple<string, double>>();
 
@@ -153,7 +160,7 @@ namespace PokeAnalyze.Analytics
             List<Tuple<string, double>> pokemonHeightAvgByType, List<Tuple<string, double>> pokemonWeightAvgByType)
         {
             var heightWeightAvgData = new HeightWeightAverageData()
-                {PokemonAverageHeight = pokemonHeightAvg, PokemonAverageWeight = pokemonWeightAvg};
+            { PokemonAverageHeight = pokemonHeightAvg, PokemonAverageWeight = pokemonWeightAvg };
 
             for (int i = 0; i < pokemonWeightAvgByType.Count; i++)
             {
