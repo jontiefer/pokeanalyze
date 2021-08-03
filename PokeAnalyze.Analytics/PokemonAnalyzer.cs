@@ -28,6 +28,8 @@ namespace PokeAnalyze.Analytics
 
         private static object _lock = new object();
 
+        private int _activeThreads = 0;
+
         public PokemonAnalyzer()
         {
             _repo = new PokemonRepo();
@@ -58,23 +60,18 @@ namespace PokeAnalyze.Analytics
             Console.WriteLine($"*** Total Time (Seconds): {ElapsedTime} ***");
         }
 
-        public async Task<HeightWeightAverageData> CalculatePokemonHeightWeightAverages(int limit, int offset)
+        public async Task<HeightWeightAverageData> CalculatePokemonHeightWeightAverages(int limit, int offset, int fetchType = 1)
         {
             _timeStart = DateTime.Now;
 
             InitCalcData();
             var pokemonQueryList = await _repo.QueryPokemonSet(limit, offset);
 
-            Task.WhenAll(Enumerable.Range(0, pokemonQueryList.Items.Count - 1)
-                .Select(async i =>
-                {
-                    var pokemon = await _repo.GetPokemonItem(pokemonQueryList.Items[i].Url);
-
-                    _pokemonHeightTotal += pokemon.Height;
-                    _pokemonWeightTotal += pokemon.Weight;
-
-                    AddHeightWeightByTypeData(pokemon);
-                })).GetAwaiter().GetResult();
+            if (fetchType == 1)
+                await FetchPokemonDataUsingAsyncTasks(pokemonQueryList);
+            else
+                FetchPokemonDataUsingThreadPool(pokemonQueryList);
+            
 
             double pokemonHeightAvg = _pokemonHeightTotal / Convert.ToDouble(pokemonQueryList.Items.Count);
             double pokemonWeightAvg = _pokemonWeightTotal / Convert.ToDouble(pokemonQueryList.Items.Count);
@@ -119,10 +116,67 @@ namespace PokeAnalyze.Analytics
             return averagesData;
         }
 
+        //Running the tasks by calling await on the set of tasks is slightly slower than explicitly blocking
+        //the main thread by calling the GetResult function of the Awaiter object associated with the Task.
+        //Even though the method is slightly slower, it will avoid potential Thread deadlock and ThreadPool
+        //exhaustion.. GetAwaiter and Get Result are considered not best practices for direct use in 
+        //deployment code.
+        private async Task FetchPokemonDataUsingAsyncTasks(PokemonQueryList pokemonQueryList)
+        {
+            var tasks = pokemonQueryList.Items.Select(async p =>
+            {
+                var pokemon = await _repo.GetPokemonItem(p.Url);
+
+                _pokemonHeightTotal += pokemon.Height;
+                _pokemonWeightTotal += pokemon.Weight;
+
+                AddHeightWeightByTypeData(pokemon);
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        //Utilizing the ThreadPool to fetch the Pokemon data from the API has similar performance in comparison
+        //with the Task library implementation to perform asynchronous execution of simultaneous HTTP requests
+        //with the HTTPClient library.
+        private void FetchPokemonDataUsingThreadPool(PokemonQueryList pokemonQueryList)
+        {
+            //Default Thread Pool min/max thread settings are efficient
+            //int maxThreads = limit;
+            //int minThreads, minCompleteThreads;
+            //ThreadPool.GetMinThreads(out minThreads, out minCompleteThreads);
+            //if (maxThreads < minThreads) maxThreads = minThreads;
+            //ThreadPool.SetMaxThreads(maxThreads, maxThreads);
+
+            _activeThreads = pokemonQueryList.Items.Count;
+
+            var threadProcs = pokemonQueryList.Items.Select(p =>
+                new WaitCallback(async (s) =>
+                {
+                    var pokemon = await _repo.GetPokemonItem(p.Url);
+
+                    _pokemonHeightTotal += pokemon.Height;
+                    _pokemonWeightTotal += pokemon.Weight;
+
+                    AddHeightWeightByTypeData(pokemon);
+                    _activeThreads--;
+                }));
+
+            foreach (var threadProc in threadProcs)
+            {
+                ThreadPool.QueueUserWorkItem(threadProc);
+            }
+
+            while (_activeThreads > 0) { }
+        }
+
         private void AddHeightWeightByTypeData(Pokemon pokemon)
         {
             foreach (var pokType in pokemon.Types)
             {
+                //Explicit thread synchronization not required with async/await, but seems to slightly improve performance. 
+                //My theory is .Net implements its own thread synchronization utilizing Tasks that can slow 
+                //performance compared to an explicit lock.
                 lock (_lock)
                 {
                     if (!_pokemonTypeHeightTotal.ContainsKey(pokType.Type.Name))

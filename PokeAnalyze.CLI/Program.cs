@@ -13,10 +13,12 @@ namespace PokeAnalyze.CLI
         {
             int limit = 0;
             int offset = 0;
+            int fetchType = 1;
 
 #if DEBUG
             args[0] = "100";
             args[1] = "0";
+            args[2] = "1";
 #endif
 
             if (args.Length == 0)
@@ -27,10 +29,14 @@ namespace PokeAnalyze.CLI
 
                 if (args.Length > 1)
                     offset = Convert.ToInt32(args[1]);
+
+                if (args.Length > 2)
+                    fetchType = Convert.ToInt32(args[2]);
             }
 
             PokemonAnalyzer analyzer = new PokemonAnalyzer();
-            await analyzer.CalculatePokemonHeightWeightAverages(limit, offset);
+            await analyzer.CalculatePokemonHeightWeightAverages(limit, offset, fetchType);
+            
             //FOR TESTING
             //analyzer.TestSpeed();
         }
