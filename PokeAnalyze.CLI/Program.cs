@@ -17,7 +17,7 @@ namespace PokeAnalyze.CLI
 
 #if DEBUG
             args[0] = "100";
-            args[1] = "0";
+            args[1] = "100";
             args[2] = "1";
 #endif
 
@@ -35,6 +35,7 @@ namespace PokeAnalyze.CLI
             }
 
             PokemonAnalyzer analyzer = new PokemonAnalyzer();
+            
             await analyzer.CalculatePokemonHeightWeightAverages(limit, offset, fetchType);
             
             //FOR TESTING

@@ -2,7 +2,7 @@
   "profiles": {
     "PokeAnalyze.CLI": {
       "commandName": "Project",
-      "commandLineArgs": "100 50",
+      "commandLineArgs": "100 50 1",
       "sqlDebugging": true
     }
   }

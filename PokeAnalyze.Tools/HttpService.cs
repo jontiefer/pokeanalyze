@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -26,9 +27,9 @@ namespace PokeAnalyze.Tools
             var handlerSocket = new SocketsHttpHandler()
             {
                 UseProxy = false,
-                MaxConnectionsPerServer = int.MaxValue,
+                MaxConnectionsPerServer = Int32.MaxValue,
                 PooledConnectionLifetime = TimeSpan.FromSeconds(500),
-                PooledConnectionIdleTimeout = TimeSpan.FromSeconds(200)
+                PooledConnectionIdleTimeout = TimeSpan.FromSeconds(200),
             };
 
             _httpClient = new HttpClient(handlerSocket);
@@ -42,19 +43,34 @@ namespace PokeAnalyze.Tools
 
         public async Task<HttpResponseWrapper<T>> GetAsync<T>(string url)
         {
-            var responseHTTP = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+            int retryAttempts = 0;
+            
+            while (retryAttempts <= 5)
+            {
+                try
+                {
+                    var responseHttp = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead)
+                        .ConfigureAwait(false);
 
-            if (responseHTTP.IsSuccessStatusCode)
-            {
-                var response = await DeserializeAsync<T>(responseHTTP, defaultJsonSerializerOptions)
-                    .ConfigureAwait(false);
-                
-                return new HttpResponseWrapper<T>(response, true, responseHTTP);
+                    if (responseHttp.IsSuccessStatusCode)
+                    {
+                        var response = await DeserializeAsync<T>(responseHttp, defaultJsonSerializerOptions)
+                            .ConfigureAwait(false);
+
+                        return new HttpResponseWrapper<T>(response, true, responseHttp);
+                    }
+                    else
+                    {
+                        return new HttpResponseWrapper<T>(default, false, default);
+                    } //end if
+                }
+                catch (Exception)
+                {
+                    retryAttempts++;
+                }
             }
-            else
-            {
-                return new HttpResponseWrapper<T>(default, false, default);
-            } //end if
+
+            return new HttpResponseWrapper<T>(default, false, default);
         }
 
         private async Task<T> DeserializeAsync<T>(HttpResponseMessage httpResponse, JsonSerializerOptions options)

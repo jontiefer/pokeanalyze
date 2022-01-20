@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography.X509Certificates;
@@ -125,12 +126,19 @@ namespace PokeAnalyze.Analytics
         {
             var tasks = pokemonQueryList.Items.Select(async p =>
             {
-                var pokemon = await _repo.GetPokemonItem(p.Url);
+                try
+                {
+                    var pokemon = await _repo.GetPokemonItem(p.Url);
 
-                _pokemonHeightTotal += pokemon.Height;
-                _pokemonWeightTotal += pokemon.Weight;
+                    _pokemonHeightTotal += pokemon.Height;
+                    _pokemonWeightTotal += pokemon.Weight;
 
-                AddHeightWeightByTypeData(pokemon);
+                    AddHeightWeightByTypeData(pokemon);
+                }
+                catch (Exception err)
+                {
+                    Debug.WriteLine($"Error at url: {p.Url}\r\nMessage:{err}");
+                }
             });
 
             await Task.WhenAll(tasks);
