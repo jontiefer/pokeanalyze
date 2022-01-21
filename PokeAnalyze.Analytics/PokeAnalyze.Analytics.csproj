@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PokeAnalyze.GraphQL\PokeAnalyze.GraphQL.csproj" />
     <ProjectReference Include="..\PokeAnalyze.Tools\PokeAnalyze.Tools.csproj" />
     <ProjectReference Include="..\PokeAnalyze.Types\PokeAnalyze.Types.csproj" />
   </ItemGroup>

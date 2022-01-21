@@ -16,6 +16,7 @@ namespace PokeAnalyze.Analytics
     public class PokemonAnalyzer
     {
         private readonly PokemonRepo _repo;
+        private readonly PokemonGraphQLRepo _graphQLRepo;
 
         private int _pokemonHeightTotal = 0;
         private int _pokemonWeightTotal = 0;
@@ -34,6 +35,7 @@ namespace PokeAnalyze.Analytics
         public PokemonAnalyzer()
         {
             _repo = new PokemonRepo();
+            _graphQLRepo = new PokemonGraphQLRepo();
         }
 
         private void InitCalcData()
@@ -70,9 +72,14 @@ namespace PokeAnalyze.Analytics
 
             if (fetchType == 1)
                 await FetchPokemonDataUsingAsyncTasks(pokemonQueryList);
-            else
+            else if (fetchType == 2)
                 FetchPokemonDataUsingThreadPool(pokemonQueryList);
-            
+            else if (fetchType == 3)
+            {
+                await FetchPokemonDataUsingGraphQL();
+                //NOTE: This will only output pokemon response data and nothing more for the time being.
+            }
+
 
             double pokemonHeightAvg = _pokemonHeightTotal / Convert.ToDouble(pokemonQueryList.Items.Count);
             double pokemonWeightAvg = _pokemonWeightTotal / Convert.ToDouble(pokemonQueryList.Items.Count);
@@ -176,6 +183,12 @@ namespace PokeAnalyze.Analytics
             }
 
             while (_activeThreads > 0) { }
+        }
+
+        private async Task FetchPokemonDataUsingGraphQL()
+        {
+            var pokemonResponseData = await _graphQLRepo.QueryPokemonItems();
+             Console.Write(pokemonResponseData);
         }
 
         private void AddHeightWeightByTypeData(Pokemon pokemon)

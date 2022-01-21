@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GraphQL.Client" Version="4.0.2" />
+    <PackageReference Include="GraphQL.Client.Abstractions" Version="4.0.2" />
+    <PackageReference Include="GraphQL.Client.Abstractions.WebSocket" Version="4.0.2" />
+    <PackageReference Include="GraphQL.Client.LocalExecution" Version="4.0.2" />
+    <PackageReference Include="GraphQL.Client.Serializer.Newtonsoft" Version="4.0.2" />
+  </ItemGroup>
+
+</Project>
